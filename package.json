@@ -2,24 +2,33 @@
   "name": "edouard",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.cjs.js",
-  "module": "dist/index.esm.js",
-  "types": "dist/index.d.ts",
+  "private": true,
+  "bin": "dist/index.cjs.js",
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "start": "tsx src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "pkg:build": "pkg --compress Brotli --output build/excelComparator .",
+    "pkg:debug": "pkg --debug --output build/excelComparator ."
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
   "type": "module",
+  "pkg": {
+    "assets": [
+      "package.json",
+      "dist/**/*"
+    ],
+    "targets": [
+      "latest-windows-x64"
+    ]
+  },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/node": "^24.10.1",
+    "@yao-pkg/pkg": "^6.10.1",
     "rollup": "^4.53.2",
     "tslib": "^2.8.1",
     "typescript": "^5.9.3"

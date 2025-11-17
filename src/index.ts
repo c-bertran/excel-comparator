@@ -1,5 +1,18 @@
 import { ExcelReader } from '@/excel';
 import { ExcelComparator } from './comparator';
+import * as fs from 'fs';
+import * as path from 'path';
+
+function validateFile(filePath: string): void {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found: ${filePath}`);
+  }
+  
+  const ext = path.extname(filePath).toLowerCase();
+  if (!['.xlsx', '.xlsm', '.xls'].includes(ext)) {
+    throw new Error(`Unsupported file format: ${ext}. Supported formats: .xlsx, .xlsm, .xls`);
+  }
+}
 
 (async () => {
   try {
@@ -9,10 +22,15 @@ import { ExcelComparator } from './comparator';
     
     if (!kmsDmlFilePath || !documentationFilePath) {
       console.error('Error: Please provide both file paths as arguments');
-      console.log('Usage: npm run start <kms-dml-file> <documentation-file>');
-      console.log('Example: npm run start test_data/KMS_DML.xlsx test_data/Documentation.xlsx');
+      console.log('Usage: ./excelComparator <kms-dml-file> <documentation-file>');
+      console.log('Example: ./excelComparator test_data/KMS_DML.xlsx test_data/Documentation.xlsx');
+      console.log('Supported formats: .xlsx, .xlsm, .xls');
       process.exit(1);
     }
+
+    // Validate files
+    validateFile(kmsDmlFilePath);
+    validateFile(documentationFilePath);
 
     console.log('📂 Loading Excel files...\n');
 
