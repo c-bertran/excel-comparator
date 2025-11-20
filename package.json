@@ -8,7 +8,7 @@
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "start": "tsx src/index.ts",
-    "pkg:build": "pkg --compress Brotli --output build/excelComparator .",
+    "pkg:build": "pkg --compress Brotli --output excelComparator .",
     "pkg:debug": "pkg --debug --output build/excelComparator ."
   },
   "keywords": [],
