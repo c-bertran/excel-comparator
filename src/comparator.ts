@@ -5,25 +5,27 @@
 export interface ComparisonResult {
   matches: MatchedRecord[];
   mismatches: MismatchedRecord[];
-  onlyInKmsDml: UnmatchedRecord[];
-  onlyInDocumentation: UnmatchedRecord[];
+  onlyInFile1: UnmatchedRecord[];
+  onlyInFile2: UnmatchedRecord[];
   summary: ComparisonSummary;
+  file1Name: string;
+  file2Name: string;
 }
 
 export interface MatchedRecord {
   reference: string;
-  kmsDmlVersion: any;
-  documentationVersion: any;
-  kmsDmlRow: number;
-  documentationRow: number;
+  file1Version: any;
+  file2Version: any;
+  file1Row: number;
+  file2Row: number;
 }
 
 export interface MismatchedRecord {
   reference: string;
-  kmsDmlVersion: any;
-  documentationVersion: any;
-  kmsDmlRow: number;
-  documentationRow: number;
+  file1Version: any;
+  file2Version: any;
+  file1Row: number;
+  file2Row: number;
 }
 
 export interface UnmatchedRecord {
@@ -33,121 +35,131 @@ export interface UnmatchedRecord {
 }
 
 export interface ComparisonSummary {
-  totalKmsDml: number;
-  totalDocumentation: number;
+  totalFile1: number;
+  totalFile2: number;
   matches: number;
   mismatches: number;
-  onlyInKmsDml: number;
-  onlyInDocumentation: number;
+  onlyInFile1: number;
+  onlyInFile2: number;
 }
 
 export class ExcelComparator {
   /**
-   * Compare KMS_DML data with Documentation data
-   * @param kmsDmlData - Data from KMS_DML (columns A and Q)
-   * @param docData - Data from Documentation (columns C and H)
+   * Compare data from two files
+   * @param file1Data - Data from first file
+   * @param file2Data - Data from second file
+   * @param file1Column - Column letter from first file
+   * @param file2Column - Column letter from second file
+   * @param file1Name - Display name for first file
+   * @param file2Name - Display name for second file
    * @returns Comparison results
    */
   compare(
-    kmsDmlData: Array<Record<string, any>>,
-    docData: Array<Record<string, any>>
+    file1Data: Array<Record<string, any>>,
+    file2Data: Array<Record<string, any>>,
+    file1Column: string,
+    file2Column: string,
+    file1Name: string = 'File 1',
+    file2Name: string = 'File 2'
   ): ComparisonResult {
     const matches: MatchedRecord[] = [];
     const mismatches: MismatchedRecord[] = [];
-    const onlyInKmsDml: UnmatchedRecord[] = [];
-    const onlyInDocumentation: UnmatchedRecord[] = [];
+    const onlyInFile1: UnmatchedRecord[] = [];
+    const onlyInFile2: UnmatchedRecord[] = [];
 
     // Create maps for easier lookup
-    const docMap = new Map<string, { version: any; row: number }>();
+    const file2Map = new Map<string, { version: any; row: number }>();
     
-    // Populate Documentation map (using column C as key, column H as version)
-    docData.forEach((row) => {
-      const reference = this.normalizeReference(row['C']);
+    // Populate file2 map using the specified column
+    file2Data.forEach((row) => {
+      const reference = this.normalizeReference(row[file2Column]);
       if (reference) {
-        docMap.set(reference, {
-          version: row['H'],
+        file2Map.set(reference, {
+          version: row[file2Column],
           row: row['_rowNumber']
         });
       }
     });
 
-    // Track which documentation records were matched
-    const matchedDocRefs = new Set<string>();
+    // Track which file2 records were matched
+    const matchedFile2Refs = new Set<string>();
 
-    // Compare KMS_DML records (column A as reference, column Q as version)
-    kmsDmlData.forEach((kmsRow) => {
-      const reference = this.normalizeReference(kmsRow['A']);
+    // Compare file1 records using the specified column
+    file1Data.forEach((file1Row) => {
+      const reference = this.normalizeReference(file1Row[file1Column]);
       
       if (!reference) return;
 
-      const kmsDmlVersion = kmsRow['Q'];
-      const kmsDmlRowNumber = kmsRow['_rowNumber'];
+      const file1Version = file1Row[file1Column];
+      const file1RowNumber = file1Row['_rowNumber'];
 
-      const docRecord = docMap.get(reference);
+      const file2Record = file2Map.get(reference);
 
-      if (docRecord) {
+      if (file2Record) {
         // Found matching reference
-        matchedDocRefs.add(reference);
+        matchedFile2Refs.add(reference);
 
-        if (this.versionsMatch(kmsDmlVersion, docRecord.version)) {
+        if (this.versionsMatch(file1Version, file2Record.version)) {
           // Versions match
           matches.push({
             reference,
-            kmsDmlVersion,
-            documentationVersion: docRecord.version,
-            kmsDmlRow: kmsDmlRowNumber,
-            documentationRow: docRecord.row
+            file1Version,
+            file2Version: file2Record.version,
+            file1Row: file1RowNumber,
+            file2Row: file2Record.row
           });
         } else {
           // Versions don't match
           mismatches.push({
             reference,
-            kmsDmlVersion,
-            documentationVersion: docRecord.version,
-            kmsDmlRow: kmsDmlRowNumber,
-            documentationRow: docRecord.row
+            file1Version,
+            file2Version: file2Record.version,
+            file1Row: file1RowNumber,
+            file2Row: file2Record.row
           });
         }
       } else {
-        // Only in KMS_DML
-        onlyInKmsDml.push({
+        // Only in file1
+        onlyInFile1.push({
           reference,
-          version: kmsDmlVersion,
-          row: kmsDmlRowNumber
+          version: file1Version,
+          row: file1RowNumber
         });
       }
     });
 
-    // Find records only in Documentation
-    docData.forEach((docRow) => {
-      const reference = this.normalizeReference(docRow['C']);
+    // Find records only in file2
+    file2Data.forEach((file2Row) => {
+      const reference = this.normalizeReference(file2Row[file2Column]);
       
       if (!reference) return;
 
-      if (!matchedDocRefs.has(reference)) {
-        onlyInDocumentation.push({
+      if (!matchedFile2Refs.has(reference)) {
+        onlyInFile2.push({
           reference,
-          version: docRow['H'],
-          row: docRow['_rowNumber']
+          version: file2Row[file2Column],
+          row: file2Row['_rowNumber']
         });
       }
     });
 
     const summary: ComparisonSummary = {
-      totalKmsDml: kmsDmlData.length,
-      totalDocumentation: docData.length,
+      totalFile1: file1Data.length,
+      totalFile2: file2Data.length,
       matches: matches.length,
       mismatches: mismatches.length,
-      onlyInKmsDml: onlyInKmsDml.length,
-      onlyInDocumentation: onlyInDocumentation.length
+      onlyInFile1: onlyInFile1.length,
+      onlyInFile2: onlyInFile2.length
     };
 
     return {
       matches,
       mismatches,
-      onlyInKmsDml,
-      onlyInDocumentation,
-      summary
+      onlyInFile1,
+      onlyInFile2,
+      summary,
+      file1Name,
+      file2Name
     };
   }
 
@@ -183,12 +195,12 @@ export class ExcelComparator {
 
     // Summary
     console.log('\n📊 SUMMARY:');
-    console.log(`   Total records in KMS_DML: ${result.summary.totalKmsDml}`);
-    console.log(`   Total records in Documentation: ${result.summary.totalDocumentation}`);
+    console.log(`   Total records in ${result.file1Name}: ${result.summary.totalFile1}`);
+    console.log(`   Total records in ${result.file2Name}: ${result.summary.totalFile2}`);
     console.log(`   ✅ Matches: ${result.summary.matches}`);
     console.log(`   ⚠️  Mismatches: ${result.summary.mismatches}`);
-    console.log(`   ➖ Only in KMS_DML: ${result.summary.onlyInKmsDml}`);
-    console.log(`   ➕ Only in Documentation: ${result.summary.onlyInDocumentation}`);
+    console.log(`   ➖ Only in ${result.file1Name}: ${result.summary.onlyInFile1}`);
+    console.log(`   ➕ Only in ${result.file2Name}: ${result.summary.onlyInFile2}`);
 
     // Matches
     if (result.matches.length > 0) {
@@ -197,8 +209,8 @@ export class ExcelComparator {
       console.log('─'.repeat(80));
       result.matches.forEach((match) => {
         console.log(`   ${match.reference}`);
-        console.log(`      Version: ${match.kmsDmlVersion}`);
-        console.log(`      KMS_DML row: ${match.kmsDmlRow}, Documentation row: ${match.documentationRow}`);
+        console.log(`      Version: ${match.file1Version}`);
+        console.log(`      ${result.file1Name} row: ${match.file1Row}, ${result.file2Name} row: ${match.file2Row}`);
       });
     }
 
@@ -209,27 +221,27 @@ export class ExcelComparator {
       console.log('─'.repeat(80));
       result.mismatches.forEach((mismatch) => {
         console.log(`   ${mismatch.reference}`);
-        console.log(`      KMS_DML version: "${mismatch.kmsDmlVersion}" (row ${mismatch.kmsDmlRow})`);
-        console.log(`      Documentation version: "${mismatch.documentationVersion}" (row ${mismatch.documentationRow})`);
+        console.log(`      ${result.file1Name} version: "${mismatch.file1Version}" (row ${mismatch.file1Row})`);
+        console.log(`      ${result.file2Name} version: "${mismatch.file2Version}" (row ${mismatch.file2Row})`);
       });
     }
 
-    // Only in KMS_DML
-    if (result.onlyInKmsDml.length > 0) {
+    // Only in File 1
+    if (result.onlyInFile1.length > 0) {
       console.log('\n' + '─'.repeat(80));
-      console.log('➖ ONLY IN KMS_DML (not found in Documentation):');
+      console.log(`➖ ONLY IN ${result.file1Name.toUpperCase()} (not found in ${result.file2Name}):`);
       console.log('─'.repeat(80));
-      result.onlyInKmsDml.forEach((record) => {
+      result.onlyInFile1.forEach((record) => {
         console.log(`   ${record.reference} (version: ${record.version}, row: ${record.row})`);
       });
     }
 
-    // Only in Documentation
-    if (result.onlyInDocumentation.length > 0) {
+    // Only in File 2
+    if (result.onlyInFile2.length > 0) {
       console.log('\n' + '─'.repeat(80));
-      console.log('➕ ONLY IN DOCUMENTATION (not found in KMS_DML):');
+      console.log(`➕ ONLY IN ${result.file2Name.toUpperCase()} (not found in ${result.file1Name}):`);
       console.log('─'.repeat(80));
-      result.onlyInDocumentation.forEach((record) => {
+      result.onlyInFile2.forEach((record) => {
         console.log(`   ${record.reference} (version: ${record.version}, row: ${record.row})`);
       });
     }
